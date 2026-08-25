@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IT5008 Tutorials</title>
+<meta name="description" content="Tutorial slides for IT5008, National University of Singapore." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%98%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --text: #16181d;
+    --muted: #6b7280;
+    --border: #e8e8ea;
+    --accent: #003d7c;
+    --accent-soft: #eef3f9;
+    --ring: rgba(0,61,124,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101114;
+      --surface: #17181c;
+      --text: #f2f3f5;
+      --muted: #9a9ea7;
+      --border: #26282e;
+      --accent: #6fa8dc;
+      --accent-soft: #1b2733;
+      --ring: rgba(111,168,220,0.16);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 5.5rem 1.5rem 4rem;
+  }
+  .kicker {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.6rem;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 2.6rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.5rem;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 1.02rem;
+    line-height: 1.55;
+    margin: 0 0 3rem;
+    max-width: 46ch;
+  }
+  .list {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--border);
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 1.15rem 0.25rem;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.15s ease, transform 0.15s ease;
+    border-radius: 10px;
+  }
+  .row:hover, .row:focus-visible {
+    background: var(--accent-soft);
+    transform: translateX(2px);
+    outline: none;
+  }
+  .num {
+    flex: none;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: grid;
+    place-items: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: inset 0 0 0 1px var(--ring);
+  }
+  .row:hover .num { background: var(--accent); color: var(--surface); }
+  .meta { flex: 1; min-width: 0; }
+  .title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .label {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .arrow {
+    flex: none;
+    color: var(--muted);
+    font-size: 1.1rem;
+    transition: transform 0.15s ease, color 0.15s ease;
+  }
+  .row:hover .arrow { color: var(--accent); transform: translate(2px, -2px); }
+  .empty {
+    padding: 2.5rem 0.25rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.82rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">IT5008 &middot; Database Systems</p>
+  <h1>Tutorials</h1>
+  <p class="sub">Weekly tutorial slides, National University of Singapore, AY26/27 Semester&nbsp;1.</p>
+
+  <div id="list" class="list"></div>
+
+  <footer>
+    <span>Pratik Karmakar</span>
+    <span>School of Computing, NUS</span>
+  </footer>
+</main>
+
+<script>
+  // Add a new entry here whenever a new tutorial's PDF is published.
+  const TUTORIALS = [
+    { num: 1, file: "slides/tut_01.pdf", title: "Entity-Relationship Model" },
+  ];
+
+  const list = document.getElementById("list");
+
+  if (TUTORIALS.length === 0) {
+    list.innerHTML = '<p class="empty">No tutorials published yet.</p>';
+  } else {
+    TUTORIALS
+      .slice()
+      .sort((a, b) => a.num - b.num)
+      .forEach(t => {
+        const a = document.createElement("a");
+        a.className = "row";
+        a.href = t.file;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.innerHTML = `
+          <span class="num">${String(t.num).padStart(2, "0")}</span>
+          <span class="meta">
+            <p class="title">${t.title}</p>
+            <p class="label">Tutorial ${t.num} &middot; PDF</p>
+          </span>
+          <span class="arrow">&#8599;</span>
+        `;
+        list.appendChild(a);
+      });
+  }
+</script>
+</body>
+</html>
