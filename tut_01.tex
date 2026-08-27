@@ -227,12 +227,12 @@ Rectangle = entity set. Diamond = relationship set. $\bullet$ = key attribute, $
   \node[relationship, visible on=<14->] (loan) at (-3,5.8) {loan};
   \node[aggbox, fit=(loan), visible on=<14->] (loanbox) {};
   \draw[eredge, visible on=<14->] (student) -- node[above,sloped,pos=0.25]{\scriptsize\itshape borrower} (loan);
-  \draw[eredge, visible on=<14->] (loan) -- (own);
+  \draw[eredge, visible on=<14->] (loan) -- (ownbox.west);
   \draw[eredge, visible on=<14->] (loan) -- (borrow);
   \node[entity, visible on=<15->] (return) at (-8,5.8) {Return};
   \node[relationship, visible on=<16->] (been) at (-5.5,5.8) {been};
   \draw[eredge, visible on=<16->] (return) -- (been);
-  \draw[eredge, visible on=<16->] (been) -- (loan);
+  \draw[eredge, visible on=<16->] (been) -- (loanbox.west);
 
   % ---- attributes, tied to their entity's own step ----
   \attrib{s-email}{keydot}{(-1.4,10.0)}{above}{email}{student}{1}
