@@ -220,19 +220,19 @@ Rectangle = entity set. Diamond = relationship set. $\bullet$ = key attribute, $
   \node[entity, visible on=<11->] (copy) at (3,3.1) {Copy};
   \node[relationship, visible on=<12->] (own) at (3,5.8) {own};
   \node[aggbox, fit=(own), visible on=<12->] (ownbox) {};
-  \draw[eredge, visible on=<12->] (student) -- node[above,sloped,pos=0.25]{\scriptsize\itshape owner} (ownbox.north);
-  \draw[eredge, visible on=<12->] (ownbox.east) -- (books);
+  \draw[eredge, visible on=<12->] (student) -- node[above,sloped,pos=0.25]{\scriptsize\itshape owner} (own);
+  \draw[eredge, visible on=<12->] (own) -- (books);
   \draw[eredge, visible on=<12->] (own) -- (copy);
   \node[entity, visible on=<13->] (borrow) at (-3,3.1) {Borrow};
   \node[relationship, visible on=<14->] (loan) at (-3,5.8) {loan};
   \node[aggbox, fit=(loan), visible on=<14->] (loanbox) {};
-  \draw[eredge, visible on=<14->] (student) -- node[above,sloped,pos=0.25]{\scriptsize\itshape borrower} (loanbox.north);
-  \draw[eredge, visible on=<14->] (loanbox.east) -- (ownbox.west);
-  \draw[eredge, visible on=<14->] (loanbox.south) -- (borrow);
+  \draw[eredge, visible on=<14->] (student) -- node[above,sloped,pos=0.25]{\scriptsize\itshape borrower} (loan);
+  \draw[eredge, visible on=<14->] (loan) -- (own);
+  \draw[eredge, visible on=<14->] (loan) -- (borrow);
   \node[entity, visible on=<15->] (return) at (-8,5.8) {Return};
   \node[relationship, visible on=<16->] (been) at (-5.5,5.8) {been};
   \draw[eredge, visible on=<16->] (return) -- (been);
-  \draw[eredge, visible on=<16->] (been) -- (loanbox.west);
+  \draw[eredge, visible on=<16->] (been) -- (loan);
 
   % ---- attributes, tied to their entity's own step ----
   \attrib{s-email}{keydot}{(-1.4,10.0)}{above}{email}{student}{1}
