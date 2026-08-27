@@ -46,7 +46,6 @@
 % ---- ER diagram styles (Chen notation, matching the course's official style) ----
 \tikzstyle{entity} = [rectangle, draw, thick, minimum width=2.1cm, minimum height=0.8cm, align=center, font=\small]
 \tikzstyle{relationship} = [diamond, draw, thick, aspect=2.4, inner sep=1pt, align=center, font=\scriptsize]
-\tikzstyle{aggbox} = [draw, thick, inner sep=7pt]
 \tikzstyle{eredge} = [-, thick]
 \tikzstyle{keydot} = [circle, fill, minimum size=4.5pt, inner sep=0pt]
 \tikzstyle{nkdot} = [circle, draw, thick, minimum size=4.5pt, inner sep=0pt]
@@ -183,8 +182,9 @@ Return      & date                    & date \\
   \attrib{leg-key}{keydot}{(8,0)}{right}{key attribute}{r1}{1}
   \attrib{leg-nk}{nkdot}{(8,-1)}{right}{non-key attribute}{r1}{1}
   \node[relationship] (r2) at (4,-2.5) {own};
-  \node[aggbox, fit=(r2)] {};
-  \node at (8,-2.5) [font=\scriptsize, align=left] {box around a relationship\\= \textbf{aggregation} (it can\\itself take part in another\\relationship, e.g.\ \textbf{own} in \textbf{loan},\\\textbf{loan} in \textbf{been})};
+  \node[relationship] (r3) at (7,-2.5) {loan};
+  \draw[eredge] (r2) -- (r3);
+  \node at (10.3,-2.5) [font=\scriptsize, align=left] {a relationship can connect\\straight to \emph{another}\\relationship's diamond ---\\that participant is an\\\textbf{aggregate} (e.g.\ \textbf{own}\\inside \textbf{loan})};
 \end{tikzpicture}
 \end{center}
 \vspace{0.3em}
@@ -219,20 +219,18 @@ Rectangle = entity set. Diamond = relationship set. $\bullet$ = key attribute, $
   \draw[eredge, visible on=<10->] (by) -- (author);
   \node[entity, visible on=<11->] (copy) at (3,3.1) {Copy};
   \node[relationship, visible on=<12->] (own) at (3,5.8) {own};
-  \node[aggbox, fit=(own), visible on=<12->] (ownbox) {};
-  \draw[eredge, visible on=<12->] (student) -- node[above,sloped]{\scriptsize\itshape owner} (ownbox.north);
-  \draw[eredge, visible on=<12->] (ownbox.east) -- (books);
+  \draw[eredge, visible on=<12->] (student) -- node[above,sloped,pos=0.28]{\scriptsize\itshape owner} (own);
+  \draw[eredge, visible on=<12->] (own) -- (books);
   \draw[eredge, visible on=<12->] (own) -- (copy);
   \node[entity, visible on=<13->] (borrow) at (-3,3.1) {Borrow};
   \node[relationship, visible on=<14->] (loan) at (-3,5.8) {loan};
-  \node[aggbox, fit=(loan), visible on=<14->] (loanbox) {};
-  \draw[eredge, visible on=<14->] (student) -- node[above,sloped]{\scriptsize\itshape borrower} (loanbox.north);
-  \draw[eredge, visible on=<14->] (loanbox.east) -- (ownbox.west);
-  \draw[eredge, visible on=<14->] (loanbox.south) -- (borrow);
+  \draw[eredge, visible on=<14->] (student) -- node[above,sloped,pos=0.28]{\scriptsize\itshape borrower} (loan);
+  \draw[eredge, visible on=<14->] (loan) -- (own);
+  \draw[eredge, visible on=<14->] (loan) -- (borrow);
   \node[entity, visible on=<15->] (return) at (-8,5.8) {Return};
   \node[relationship, visible on=<16->] (been) at (-5.5,5.8) {been};
   \draw[eredge, visible on=<16->] (return) -- (been);
-  \draw[eredge, visible on=<16->] (been) -- (loanbox.west);
+  \draw[eredge, visible on=<16->] (been) -- (loan);
 
   % ---- attributes, tied to their entity's own step ----
   \attrib{s-email}{keydot}{(-1.4,10.0)}{above}{email}{student}{1}
@@ -256,8 +254,8 @@ Rectangle = entity set. Diamond = relationship set. $\bullet$ = key attribute, $
   \cardlabel{(-3.75,9.25)}{(1,n)}{20}{21}  % 4. Graduation -- has
   \cardlabel{(7.5,9.25)}{(1,1)}{21}{22}    % 5. Departments -- in
   \cardlabel{(10.5,9.25)}{(1,n)}{22}{23}   % 6. Faculties -- in
-  \cardlabel{(-1.9,7.35)}{(0,n)}{23}{24}   % 7. loan -- Students (borrower)
-  \cardlabel{(1.9,7.35)}{(0,n)}{24}{25}    % 8. own -- Students (owner)
+  \cardlabel{(-2.3,6.55)}{(0,n)}{23}{24}   % 7. loan -- Students (borrower)
+  \cardlabel{(2.3,6.55)}{(0,n)}{24}{25}    % 8. own -- Students (owner)
   \cardlabel{(5.2,6.1)}{(0,n)}{25}{26}     % 9. Books -- own
   \cardlabel{(7.8,4.45)}{(1,n)}{26}{27}    % 10. Books -- by
   \cardlabel{(7.8,1.85)}{(1,n)}{27}{28}    % 11. Author -- by
@@ -293,10 +291,10 @@ Rectangle = entity set. Diamond = relationship set. $\bullet$ = key attribute, $
 \small
 \begin{itemize}
   \item \textbf{own} and \textbf{loan} are \emph{ternary}: a student owning/borrowing involves \emph{three} participants at once (student, book/copy, and the copy/borrow event) --- a binary relationship cannot express that.
-  \item \textbf{Two} relationships must be boxed as \textbf{aggregates}, because each is itself a participant in a further relationship (a plain relationship cannot connect directly to another relationship):
+  \item \textbf{Two} relationships act as \textbf{aggregates}: their diamond is connected to \emph{directly}, by another relationship, rather than only to entities:
   \begin{itemize}
-    \item \textbf{own} $\to$ boxed, because \textbf{loan} needs to reference ``this particular owned copy'' as a whole, not just \texttt{Students} or \texttt{Copy} alone.
-    \item \textbf{loan} $\to$ also boxed, because \textbf{been} needs to reference ``this particular loan event'' as a whole, not just \texttt{Students}, \texttt{own}, or \texttt{Borrow} alone.
+    \item \textbf{loan} connects straight to the \textbf{own} diamond, because it needs ``this particular owned copy'' as a whole, not just \texttt{Students} or \texttt{Copy} alone.
+    \item \textbf{been} connects straight to the \textbf{loan} diamond, because it needs ``this particular loan event'' as a whole, not just \texttt{Students}, \textbf{own}, or \texttt{Borrow} alone.
   \end{itemize}
   \item \textbf{Students} plays two \emph{roles}: \emph{owner} (into \textbf{own}) and \emph{borrower} (into \textbf{loan}) --- same entity set, two different participations.
 \end{itemize}
