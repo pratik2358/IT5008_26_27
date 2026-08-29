@@ -1,0 +1,244 @@
+\documentclass{beamer}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,positioning,calc,fit}
+\usetikzlibrary{overlay-beamer-styles}
+\usepackage{booktabs,multicol,stackengine}
+\usepackage[table,dvipsnames]{xcolor}
+\usepackage{cancel}
+\usepackage{moresize}
+\usepackage{hyperref}
+
+\usepackage{listings}
+\definecolor{nus-orange}{RGB}{239,124,0}
+\definecolor{nus-blue}{RGB}{0,61,124}
+\definecolor{halfgray}{gray}{0.55}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries\color{nus-blue},
+  stringstyle=\color{ForestGreen},
+  numbers=left,
+  numberstyle=\scriptsize\color{halfgray},
+  rulesepcolor=\color{nus-orange},
+  frame=shadowbox,
+  columns=flexible,
+  showstringspaces=false,
+  keepspaces=true,
+  tabsize=2,
+  breaklines=true
+}
+
+\renewcommand{\figurename}{Figure}
+\renewcommand{\algorithmname}{Algorithm}
+
+\usepackage{SHU}
+\input{macros}
+
+\title{IT5008: Tutorial 2 --- Relational Schema \& Integrity Constraints}
+\author{\href{https://pratik2358.github.io/}{Pratik Karmakar}}
+\institute{School of Computing,\\ National University of Singapore}
+\date{AY26/27 S1}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \IfFileExists{nus-logo.png}{
+    \begin{figure}[htpb]\centering
+      \includegraphics[keepaspectratio, scale=0.18]{nus-logo.png}
+    \end{figure}
+  }{}
+\end{frame}
+
+\section{Recap}
+
+\begin{frame}{The Intern's Schema (Book Exchange, Recap)}
+\small
+Same scenario as Tutorial 1, but this time we work against the \textbf{alternative schema} the intern wrote --- flat tables, no ER diagram. The tables relevant to today's discussion:
+\begin{itemize}
+  \item \textbf{student}(name, \underline{email}, year, faculty, department, graduate)
+  \item \textbf{book}(title, format, pages, language, author, publisher, pubdate, isbn10 \emph{(unique)}, \underline{isbn13})
+  \item \textbf{copy}(\underline{owner}, \underline{book}, \underline{copy}, available) --- \texttt{book} references \texttt{book(isbn13)}
+  \item \textbf{loan}(borrower, owner, book, copy, borrowed, returned) --- references \texttt{copy}
+\end{itemize}
+\medskip
+We'll assume Q1--Q2 (DDL/DML, done before class) are already sorted, and pick up at \textbf{Q3--Q4}, the questions marked for in-class discussion.
+\end{frame}
+
+\section{Integrity Constraints}
+
+\begin{frame}{What Does \texttt{DEFERRABLE} Mean?}
+\small
+Only \texttt{UNIQUE}, \texttt{PRIMARY KEY} and \texttt{FOREIGN KEY} constraints can carry one of three qualifiers:
+\begin{itemize}
+  \item \texttt{NOT DEFERRABLE} --- the \textbf{default}. Always checked \emph{immediately}, i.e.\ right after the statement that could violate it.
+  \item \texttt{DEFERRABLE INITIALLY IMMEDIATE} --- deferrable, but checked immediately unless a transaction says otherwise.
+  \item \texttt{DEFERRABLE INITIALLY DEFERRED} --- checked only at \texttt{COMMIT} / \texttt{END TRANSACTION}, unless overridden.
+\end{itemize}
+\medskip
+``Immediate'' vs.\ ``deferred'' is about \emph{when} the check runs: after every \texttt{INSERT}/\texttt{UPDATE}/\texttt{DELETE}, or once at the end of the whole transaction.
+\begin{itemize}
+  \item \texttt{CHECK} constraints \textbf{cannot} be deferred in current PostgreSQL --- only unique/PK/FK can.
+  \item \texttt{NUNStASchema.sql} marks some FKs \texttt{DEFERRABLE} on purpose --- that's what today's example exploits.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{A Motivating Example}
+\small
+First, insert a copy of the new book, owned by Tikki:
+\begin{lstlisting}[language=SQL]
+INSERT INTO copy VALUES (
+  'tikki@gmail.com', '978-0321197849', 1, 'TRUE'
+);
+\end{lstlisting}
+Now \texttt{copy} has a row whose \texttt{book} column is only valid \emph{because} that ISBN-13 exists in \texttt{book}. What happens if we then try to delete \emph{both} the book and its copy, in the same transaction?
+\begin{lstlisting}[language=SQL]
+BEGIN TRANSACTION;
+  SET CONSTRAINTS ALL <<IMMEDIATE|DEFERRED>>;
+  DELETE FROM book WHERE ISBN13 = '978-0321197849';
+  DELETE FROM copy WHERE book = '978-0321197849';
+END TRANSACTION;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Transaction 1 --- \texttt{ALL IMMEDIATE}}
+\small
+\begin{lstlisting}[language=SQL]
+BEGIN TRANSACTION;
+  SET CONSTRAINTS ALL IMMEDIATE;
+  DELETE FROM book WHERE ISBN13 = '978-0321197849';  -- (*)
+  DELETE FROM copy WHERE book = '978-0321197849';
+END TRANSACTION;
+\end{lstlisting}
+\begin{itemize}
+  \item Line (*) is checked \emph{right away}: it would orphan the \texttt{copy} row we just inserted $\Rightarrow$ the FK from \texttt{copy} to \texttt{book} is violated \textbf{immediately}.
+  \item The statement fails and the transaction aborts --- the second \texttt{DELETE} never even runs.
+  \item \texttt{ALL IMMEDIATE} is the default anyway, so dropping that line changes nothing: it fails the same way.
+  \item If a transaction is left hanging after an error, remember to issue \texttt{END TRANSACTION} (or \texttt{ROLLBACK}) yourself.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Transaction 2 --- \texttt{ALL DEFERRED}}
+\small
+\begin{lstlisting}[language=SQL]
+BEGIN TRANSACTION;
+  SET CONSTRAINTS ALL DEFERRED;
+  DELETE FROM book WHERE ISBN13 = '978-0321197849';  -- (*)
+  DELETE FROM copy WHERE book = '978-0321197849';    -- (**)
+END TRANSACTION;
+\end{lstlisting}
+\begin{itemize}
+  \item After (*): the FK check is \emph{postponed}. The database is momentarily \textbf{inconsistent} --- a \texttt{copy} row pointing at a \texttt{book} that no longer exists.
+  \item Run the two \texttt{SELECT}s from the tutorial sheet between (*) and (**) and you'd see exactly that: \texttt{book} empty, \texttt{copy} still there.
+  \item After (**): the dangling \texttt{copy} row is gone too.
+  \item At \texttt{END TRANSACTION}, the FK is finally checked --- and by now it holds, so the transaction \textbf{commits}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Why Bother Deferring?}
+\small
+\begin{itemize}
+  \item Some consistent \emph{end states} are only reachable by passing through an inconsistent \emph{intermediate} state --- deferring lets the database tolerate that, as long as everything is fixed up by \texttt{COMMIT}.
+  \item Checking eagerly (the default) is safer for accidents, but it forces you to order statements very carefully, or use extra tricks (temporary NULLs, deleting children before parents, \dots).
+  \item Deferring only postpones \emph{when} a constraint is checked --- it never disables the constraint.
+  \item Useful transaction control: \texttt{BEGIN}, \texttt{COMMIT}, \texttt{SAVEPOINT s}, \texttt{ROLLBACK TO s}.
+\end{itemize}
+\end{frame}
+
+\section{Schema Refactoring}
+
+\begin{frame}[fragile]{\texttt{copy.available}: Data We Don't Need to Store}
+\small
+A copy is unavailable \emph{exactly when} it's on loan and not yet returned --- that's derivable from \texttt{loan}, so storing it again in \texttt{copy} is redundant (and can drift out of sync).
+\begin{lstlisting}[language=SQL]
+SELECT owner, book, copy, returned
+FROM loan
+WHERE returned ISNULL;          -- currently unavailable copies
+\end{lstlisting}
+Once we're convinced, drop the column:
+\begin{lstlisting}[language=SQL]
+ALTER TABLE copy
+DROP COLUMN available;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Getting \texttt{available} Back --- as a View}
+\small
+If client code still expects an \texttt{available} column, reconstruct it with a view instead of storing it:
+\begin{lstlisting}[language=SQL]
+CREATE OR REPLACE VIEW copy_view (owner, book, copy, available) AS (
+  SELECT DISTINCT c.owner, c.book, c.copy,
+    CASE WHEN EXISTS (
+      SELECT * FROM loan l
+      WHERE l.owner = c.owner AND l.book = c.book
+        AND l.copy = c.copy AND l.returned ISNULL
+    ) THEN 'FALSE' ELSE 'TRUE' END
+  FROM copy c
+);
+\end{lstlisting}
+\texttt{SELECT * FROM copy\_view;} now reads just like the old table did.
+\end{frame}
+
+\begin{frame}[fragile]{Is \texttt{copy\_view} Updatable?}
+\small
+\begin{lstlisting}[language=SQL]
+UPDATE copy_view
+SET owner = 'tikki@google.com'
+WHERE owner = 'tikki@gmail.com';
+\end{lstlisting}
+\begin{itemize}
+  \item In principle, every column \emph{except} the derived \texttt{available} should be updatable --- \texttt{owner}/\texttt{book}/\texttt{copy} map straight back to the underlying table.
+  \item In practice, PostgreSQL won't do this automatically for a view built on \texttt{DISTINCT} + a correlated \texttt{EXISTS} subquery: it isn't ``simple'' enough to be auto-updatable.
+  \item Fix: program the behaviour explicitly with an \texttt{INSTEAD OF} trigger, or an unconditional \texttt{ON UPDATE DO INSTEAD} rule --- triggers are a second-half-of-semester topic.
+  \item Drop the view once it's no longer needed: \texttt{DROP VIEW copy\_view;}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{\texttt{student(department, faculty)}: One Fact, Stored Twice}
+\small
+\texttt{department} \textbf{determines} \texttt{faculty}: every row with the same \texttt{department} must carry the same \texttt{faculty}. This is a \textbf{functional dependency} (department $\to$ faculty), formalized properly later in the course.
+\begin{itemize}
+  \item Storing \texttt{faculty} on every \texttt{student} row repeats the same (department, faculty) pair once per student.
+  \item That's redundant, and it opens the door to inconsistency: nothing stops two students in \texttt{'CS'} from being given \emph{different} faculties by mistake.
+  \item Fix: store the (department, faculty) mapping \textbf{once}, in its own table; \texttt{student} keeps only \texttt{department} and looks the faculty up via a foreign key.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{The Refactor in SQL}
+\begin{lstlisting}[language=SQL]
+CREATE TABLE department (
+  department VARCHAR(32) PRIMARY KEY,
+  faculty    VARCHAR(62) NOT NULL
+);
+
+INSERT INTO department
+  SELECT DISTINCT department, faculty
+  FROM student;
+
+ALTER TABLE student
+DROP COLUMN faculty;
+
+ALTER TABLE student
+ADD FOREIGN KEY (department) REFERENCES department(department);
+\end{lstlisting}
+\small
+\textbf{Order matters:} populate \texttt{department} from the existing data \emph{before} dropping \texttt{faculty} from \texttt{student}, or the mapping is lost.
+\end{frame}
+
+\begin{frame}
+\begin{center}
+Questions?\\
+Drop a mail at: pratik.karmakar@u.nus.edu
+\end{center}
+\end{frame}
+
+\end{document}
