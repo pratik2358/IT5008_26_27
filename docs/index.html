@@ -75,21 +75,69 @@
     flex-direction: column;
     border-top: 1px solid var(--border);
   }
+  .item {
+    border-bottom: 1px solid var(--border);
+  }
   .row {
     display: flex;
     align-items: center;
     gap: 1.1rem;
     padding: 1.15rem 0.25rem;
-    border-bottom: 1px solid var(--border);
     text-decoration: none;
     color: inherit;
     transition: background-color 0.15s ease, transform 0.15s ease;
     border-radius: 10px;
   }
+  .item .row {
+    padding-bottom: 0.6rem;
+  }
+  .item .row:only-child {
+    padding-bottom: 1.15rem;
+  }
   .row:hover, .row:focus-visible {
     background: var(--accent-soft);
     transform: translateX(2px);
     outline: none;
+  }
+  .video-row {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 0.4rem 0.25rem;
+    margin-left: 2.3rem;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.15s ease, transform 0.15s ease;
+    border-radius: 10px;
+  }
+  .video-row:last-child {
+    padding-bottom: 1.15rem;
+  }
+  .video-row:hover, .video-row:focus-visible {
+    background: var(--accent-soft);
+    transform: translateX(2px);
+    outline: none;
+  }
+  .video-row .thumb {
+    width: 3.4rem;
+  }
+  .video-row .play-badge {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+  }
+  .video-row .play-badge span {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 0.7rem;
+    padding-left: 0.1rem;
   }
   .thumb {
     flex: none;
@@ -101,6 +149,7 @@
     overflow: hidden;
     display: grid;
     place-items: center;
+    position: relative;
   }
   .thumb img {
     width: 100%;
@@ -168,13 +217,42 @@
 <script>
   // Add a new entry here whenever a new tutorial's PDF is published.
   // thumb: first-page preview, generated with e.g.
-  //   pdftoppm -png -r 300 -f 1 -l 1 tut_01.pdf thumb && sips -Z 480 thumb-1.png --out slides/thumbs/tut_01.png
+  //   pdftoppm -png -r 300 -f 1 -l 1 tut_01.pdf thumb && sips -Z 480 thumb-01.png --out slides/thumbs/tut_01.png
+  //
+  // Optional `videos` array (see videos/<topic>/render.sh for how each
+  // src/thumb pair is built): [{ src, thumb, title }, ...].
   const TUTORIALS = [
-    { num: 1, file: "slides/tut_01.pdf", thumb: "slides/thumbs/tut_01.png", title: "Entity-Relationship Model" },
+    {
+      num: 1, file: "slides/tut_01.pdf", thumb: "slides/thumbs/tut_01.png",
+      title: "Entity-Relationship Model",
+      videos: [
+        {
+          src: "videos/tut_01_er_aggregation.mp4",
+          thumb: "videos/thumbs/tut_01_er_aggregation.png",
+          title: "Aggregation in ER Diagrams",
+        },
+        {
+          src: "videos/tut_01_participation_constraints.mp4",
+          thumb: "videos/thumbs/tut_01_participation_constraints.png",
+          title: "Participation Constraints",
+        },
+      ],
+    },
     { num: 2, file: "slides/tut_02.pdf", thumb: "slides/thumbs/tut_02.png", title: "Relational Schema & Integrity Constraints" },
   ];
 
   const list = document.getElementById("list");
+
+  function loadThumb(container, src) {
+    const img = new Image();
+    img.alt = "";
+    img.onload = () => {
+      const fallback = container.querySelector(".fallback");
+      if (fallback) fallback.remove();
+      container.prepend(img);
+    };
+    img.src = src;
+  }
 
   if (TUTORIALS.length === 0) {
     list.innerHTML = '<p class="empty">No tutorials published yet.</p>';
@@ -184,6 +262,9 @@
       .sort((a, b) => a.num - b.num)
       .forEach(t => {
         const num = String(t.num).padStart(2, "0");
+        const item = document.createElement("div");
+        item.className = "item";
+
         const a = document.createElement("a");
         a.className = "row";
         a.href = t.file;
@@ -197,13 +278,28 @@
           </span>
           <span class="arrow">&#8599;</span>
         `;
-        if (t.thumb) {
-          const img = new Image();
-          img.alt = "";
-          img.onload = () => a.querySelector(".thumb").replaceChildren(img);
-          img.src = t.thumb;
-        }
-        list.appendChild(a);
+        if (t.thumb) loadThumb(a.querySelector(".thumb"), t.thumb);
+        item.appendChild(a);
+
+        (t.videos || []).forEach(vid => {
+          const v = document.createElement("a");
+          v.className = "video-row";
+          v.href = vid.src;
+          v.target = "_blank";
+          v.rel = "noopener";
+          v.innerHTML = `
+            <span class="thumb"><span class="fallback">${num}</span><span class="play-badge"><span>&#9654;</span></span></span>
+            <span class="meta">
+              <p class="title">${vid.title || "Watch the video"}</p>
+              <p class="label">Tutorial ${t.num} &middot; Video</p>
+            </span>
+            <span class="arrow">&#8599;</span>
+          `;
+          if (vid.thumb) loadThumb(v.querySelector(".thumb"), vid.thumb);
+          item.appendChild(v);
+        });
+
+        list.appendChild(item);
       });
   }
 </script>

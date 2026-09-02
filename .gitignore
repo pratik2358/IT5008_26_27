@@ -23,3 +23,9 @@
 
 # Not published: preliminary Q&A PDFs, kept locally for reference only
 /QnA/
+
+# Manim build artifacts and rendered output -- the published copy that
+# the website serves lives in docs/videos/, committed on purpose.
+videos/*/media/
+videos/*/__pycache__/
+videos/*/*.mp4
