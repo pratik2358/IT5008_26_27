@@ -17,14 +17,12 @@ MANIM="/Users/pratik/opt/anaconda3/bin/manim"
 
 SCENES=(
   S01_Title
-  S02_Scenario
-  S03_NaiveRace
-  S04_TheConstraint
-  S05_RaceImmediate
-  S06_RaceDeferred
-  S07_WhatChanged
-  S08_Gotcha
-  S09_Takeaway
+  S02_TheSchema
+  S03_TheCollision
+  S04_RaceImmediate
+  S05_RaceDeferred
+  S06_WhatChanged
+  S07_Takeaway
 )
 
 cd "$DIR"
@@ -58,7 +56,7 @@ mkdir -p "$SITE_DIR/thumbs"
 cp "$FINAL" "$SITE_DIR/tut_02_concurrency_deferrable.mp4"
 
 # Grab a thumbnail from the deferred-race scene.
-ffmpeg -y -ss 00:01:08 -i "$FINAL" -frames:v 1 -vf "scale=480:-1" \
+ffmpeg -y -ss 00:00:59 -i "$FINAL" -frames:v 1 -vf "scale=480:-1" \
   "$SITE_DIR/thumbs/tut_02_concurrency_deferrable.png"
 
 echo "Copied video + thumbnail into $SITE_DIR"
