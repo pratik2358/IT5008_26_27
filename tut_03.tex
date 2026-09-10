@@ -112,9 +112,21 @@ FROM student s;
 \end{lstlisting}
 \end{frame}
 
-\begin{frame}[fragile]{1(c). Loan Duration, Single Table}
+\begin{frame}[fragile]{1(c). Loan Duration --- Returned Copies Only}
 \small
-Only \texttt{loan} is needed. A loan not yet returned has no fixed duration yet --- treat it as running until today with \texttt{COALESCE}.
+Only \texttt{loan} is needed. The question asks for copies that have been \textbf{borrowed and returned} --- so filter out any loan that's still open.
+\begin{lstlisting}[language=SQL]
+SELECT l.book, (l.returned - l.borrowed + 1) AS duration
+FROM loan l
+WHERE l.returned IS NOT NULL
+ORDER BY l.book ASC, duration DESC;
+\end{lstlisting}
+No \texttt{COALESCE} needed here --- the \texttt{WHERE} clause already guarantees \texttt{returned} is never \texttt{NULL}.
+\end{frame}
+
+\begin{frame}[fragile]{1(c). ...Or Every Loan, Returned or Not}
+\small
+If instead we want \textbf{every} loan --- including ones still out --- swap the \texttt{WHERE} filter for \texttt{COALESCE}: a loan not yet returned has no fixed duration yet, so treat it as running until today.
 \begin{lstlisting}[language=SQL]
 SELECT l.book,
   (COALESCE(l.returned, CURRENT_DATE) - l.borrowed + 1) AS duration
