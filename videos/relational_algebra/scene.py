@@ -157,13 +157,13 @@ class S02_Legend(WatermarkedScene):
         ]
         lines = VGroup()
         for sym, name, desc, sqlword in rows_data:
-            symtex = MathTex(sym, font_size=34, color=HL)
-            nm = Text(name, font_size=22, color=WHITE, weight=BOLD)
-            ds = Text(desc, font_size=19, color=GREY_B)
-            sq = Text(sqlword, font=MONO_FONT, font_size=18, color=ACCENT)
+            symtex = MathTex(sym, font_size=40, color=HL)
+            nm = Text(name, font_size=25, color=WHITE, weight=BOLD)
+            ds = Text(desc, font_size=22, color=GREY_B)
+            sq = Text(sqlword, font=MONO_FONT, font_size=20, color=ACCENT)
             row = VGroup(symtex, nm, ds, sq).arrange(RIGHT, buff=0.45)
             lines.add(row)
-        lines.arrange(DOWN, buff=0.32, aligned_edge=LEFT)
+        lines.arrange(DOWN, buff=0.34, aligned_edge=LEFT)
         lines.next_to(heading, DOWN, buff=0.6)
         self.play(FadeIn(lines, lag_ratio=0.15))
         self.wait(2.4)
@@ -171,7 +171,7 @@ class S02_Legend(WatermarkedScene):
         note = Text(
             "Every \"simple query\" in this tutorial is just these,"
             " composed.",
-            font_size=22, color=HL,
+            font_size=24, color=HL,
         )
         note.next_to(lines, DOWN, buff=0.5)
         self.play(FadeIn(note, shift=UP * 0.2))
@@ -202,16 +202,16 @@ class S03_Projection(WatermarkedScene):
         self.play(Create(dept_table))
 
         ra1 = ra_expr(r"\pi_{\,\mathit{department}}(\text{department})",
-                      font_size=24)
+                      font_size=30)
         sql1 = sql_block(["SELECT d.department", "FROM department d;"],
-                          font_size=18)
+                          font_size=20)
         panel1 = VGroup(labelled_box(ra1, "1(a)"),
                          labelled_box(sql1, "SQL")).arrange(
                              DOWN, aligned_edge=LEFT, buff=0.3)
         panel1.next_to(dept_table, RIGHT, buff=0.8).align_to(dept_table, UP)
         self.play(FadeIn(panel1, shift=LEFT * 0.2))
         note1 = Text("department is a PRIMARY KEY — never duplicates",
-                      font_size=18, color=GOOD)
+                      font_size=20, color=GOOD)
         note1.next_to(panel1, DOWN, buff=0.3).align_to(panel1, LEFT)
         self.play(FadeIn(note1, shift=UP * 0.2))
         self.wait(1.4)
@@ -228,10 +228,12 @@ class S03_Projection(WatermarkedScene):
         stu_table.to_edge(LEFT, buff=0.9).shift(UP * 0.6)
         self.play(Create(stu_table))
 
-        ra2 = ra_expr(r"\pi_{\,\mathit{department}}(\text{student})",
-                      font_size=24)
+        ra2 = ra_expr(
+            r"\delta\big(\pi_{\,\mathit{department}}(\text{student})\big)",
+            font_size=30,
+        )
         sql2 = sql_block(["SELECT DISTINCT s.department", "FROM student s;"],
-                          font_size=18, highlight_lines={0: ["DISTINCT"]})
+                          font_size=20, highlight_lines={0: ["DISTINCT"]})
         panel2 = VGroup(labelled_box(ra2, "1(b)"),
                          labelled_box(sql2, "SQL")).arrange(
                              DOWN, aligned_edge=LEFT, buff=0.3)
@@ -239,21 +241,21 @@ class S03_Projection(WatermarkedScene):
         self.play(FadeIn(panel2, shift=LEFT * 0.2))
         self.wait(0.6)
 
-        raw = Text("raw projection:  [CS, CS, Math]  ← CS repeats",
-                    font_size=19, color=BAD)
+        raw = Text("raw π_department(student):  [CS, CS, Math]  ← CS repeats",
+                    font_size=21, color=BAD)
         raw.next_to(panel2, DOWN, buff=0.35).align_to(panel2, LEFT)
         self.play(FadeIn(raw, shift=UP * 0.2))
         self.wait(1)
 
         dedup = ra_expr(r"\delta(\cdot) \;=\; \{\mathrm{CS},\ \mathrm{Math}\}",
-                         font_size=24, color=GOOD)
+                         font_size=28, color=GOOD)
         dedup.next_to(raw, DOWN, buff=0.3).align_to(panel2, LEFT)
         self.play(FadeIn(dedup, shift=UP * 0.2))
         self.wait(1.6)
 
         note2 = Text(
             "DISTINCT = π, then δ removes the repeats",
-            font_size=19, color=HL,
+            font_size=21, color=HL,
         )
         note2.next_to(dedup, DOWN, buff=0.35).align_to(panel2, LEFT)
         self.play(FadeIn(note2, shift=UP * 0.2))
@@ -284,21 +286,21 @@ class S04_ExtendedProjection(WatermarkedScene):
         self.play(Create(loan_table))
 
         ra_line1 = ra_expr(r"\pi_{\,\mathit{book},\ \mathrm{dur}}(\text{loan})",
-                            font_size=20)
+                            font_size=27)
         ra_line2 = ra_expr(
             r"\mathrm{dur} = \mathrm{COALESCE}(\mathit{returned},"
             r"\mathrm{today}) - \mathit{borrowed} + 1",
-            font_size=16, color=GREY_B,
+            font_size=20, color=GREY_B,
         )
         ra = VGroup(ra_line1, ra_line2).arrange(DOWN, aligned_edge=LEFT,
-                                                  buff=0.15)
+                                                  buff=0.18)
         sql = sql_block([
             "SELECT l.book,",
             "  (COALESCE(l.returned, CURRENT_DATE)",
             "   - l.borrowed + 1) AS duration",
             "FROM loan l",
             "ORDER BY l.book ASC, duration DESC;",
-        ], font_size=17)
+        ], font_size=19)
         panel = VGroup(labelled_box(ra, "Relational Algebra"),
                         labelled_box(sql, "SQL")).arrange(
                             DOWN, aligned_edge=LEFT, buff=0.35)
@@ -322,7 +324,7 @@ class S04_ExtendedProjection(WatermarkedScene):
         note = Text(
             "A row without a return date isn't excluded —\n"
             "it's treated as still running, until today.",
-            font_size=19, color=HL, line_spacing=1.3,
+            font_size=21, color=HL, line_spacing=1.3,
         )
         note.next_to(result_table, RIGHT, buff=0.6)
         self.play(FadeIn(note, shift=LEFT * 0.2))
@@ -360,7 +362,7 @@ class S05_JoinSelectProject(WatermarkedScene):
         self.play(Create(both))
 
         step1 = ra_expr(r"\text{loan} \Join_{\,\mathit{book}}\, \text{book}",
-                         font_size=24)
+                         font_size=30)
         step1.next_to(both, DOWN, buff=0.3)
         self.play(Write(step1))
         self.wait(0.6)
@@ -368,7 +370,7 @@ class S05_JoinSelectProject(WatermarkedScene):
         step2 = ra_expr(
             r"\sigma_{\,\mathit{publisher}=\mathrm{Wiley}\ \land\ "
             r"\mathit{returned}\ \text{IS NULL}}(\cdot)",
-            font_size=20, color=HL,
+            font_size=26, color=HL,
         )
         step2.next_to(step1, DOWN, buff=0.3)
         self.play(Write(step2))
@@ -376,7 +378,7 @@ class S05_JoinSelectProject(WatermarkedScene):
 
         keep_note = Text(
             "Only row 1 survives: book 111 is Wiley, and still unreturned",
-            font_size=18, color=GOOD,
+            font_size=20, color=GOOD,
         )
         keep_note.next_to(step2, DOWN, buff=0.3)
         self.play(FadeIn(keep_note, shift=UP * 0.2))
@@ -384,27 +386,60 @@ class S05_JoinSelectProject(WatermarkedScene):
 
         self.clear_scene()
 
-        heading2 = Text("...then join twice more, for names and faculties",
-                         font_size=26, weight=BOLD)
+        # --- The full composed expression, matching tut_03.tex's own
+        # s1/s2/d1/d2 aliases: s1,d1 resolve the owner's name+faculty,
+        # s2,d2 the borrower's. ---
+        heading2 = Text("The full expression for 2(a)", font_size=30,
+                         weight=BOLD)
         heading2.to_edge(UP)
         self.play(FadeIn(heading2, shift=UP * 0.2))
 
-        note = Text(
-            "Same idea, twice: join student ⋈ department once for the\n"
-            "owner (alice), once more for the borrower (bob) — exactly\n"
-            "the join step we already walked through above.",
-            font_size=21, color=WHITE, line_spacing=1.35,
+        alias_note = Text(
+            "s1, d1 = owner's student + department;"
+            "  s2, d2 = borrower's",
+            font_size=19, color=GREY_B,
         )
-        note.next_to(heading2, DOWN, buff=0.6)
+        alias_note.next_to(heading2, DOWN, buff=0.35)
+        self.play(FadeIn(alias_note, shift=UP * 0.2))
+
+        full1 = ra_expr(
+            r"\pi_{\,\mathit{title},\ s_1.\mathit{name},\ d_1.\mathit{faculty}"
+            r",\ s_2.\mathit{name},\ d_2.\mathit{faculty}}\Big(",
+            font_size=25,
+        )
+        full2 = ra_expr(
+            r"\sigma_{\,\mathit{publisher}=\mathrm{Wiley}\ \land\ "
+            r"\mathit{returned}\ \text{IS NULL}}\Big(",
+            font_size=25,
+        )
+        full3 = ra_expr(
+            r"\text{loan} \Join \text{book} \Join s_1 \Join d_1 "
+            r"\Join s_2 \Join d_2\Big)\Big)",
+            font_size=25,
+        )
+        full_expr = VGroup(full1, full2, full3).arrange(
+            DOWN, aligned_edge=LEFT, buff=0.2)
+        full2.shift(RIGHT * 0.4)
+        full3.shift(RIGHT * 0.8)
+        full_expr.next_to(alias_note, DOWN, buff=0.45)
+        self.play(Write(full_expr))
+        self.wait(2)
+
+        note = Text(
+            "Same join step we already walked through above — just"
+            " applied twice more.",
+            font_size=19, color=WHITE,
+        )
+        note.next_to(full_expr, DOWN, buff=0.4)
         self.play(FadeIn(note, shift=UP * 0.2))
-        self.wait(1.6)
+        self.wait(1)
 
         result_cols = ["title", "ownerName", "ownerFaculty",
                        "borrowerName", "borrowerFaculty"]
         result_rows = [["Intro DB", "Alice", "Computing", "Bob", "Computing"]]
         result_t = relation_table(result_rows, result_cols, name="result",
-                                   scale=0.48, name_color=GOOD)
-        result_t.next_to(note, DOWN, buff=0.6)
+                                   scale=0.44, name_color=GOOD)
+        result_t.next_to(note, DOWN, buff=0.45)
         self.play(Create(result_t))
         self.wait(2)
 
@@ -438,13 +473,20 @@ class S06_IntegrityCheck(WatermarkedScene):
         both.next_to(heading, DOWN, buff=0.4)
         self.play(Create(both))
 
-        ra = ra_expr(
+        ra_line1 = ra_expr(r"\delta\Big(\pi_{\,\mathit{email}}\Big(",
+                            font_size=26)
+        ra_line2 = ra_expr(
             r"\sigma_{\,(\mathit{email}=\mathit{borrower}\ \lor\ "
             r"\mathit{email}=\mathit{owner})\ \land\ "
             r"\mathit{borrowed}\,<\,\mathit{year}}(\text{student}"
             r"\times\text{loan})",
-            font_size=18,
+            font_size=22,
         )
+        ra_line3 = ra_expr(r"\Big)\Big)", font_size=26)
+        ra = VGroup(ra_line1, ra_line2, ra_line3).arrange(
+            DOWN, aligned_edge=LEFT, buff=0.15)
+        ra_line2.shift(RIGHT * 0.5)
+        ra_line3.shift(RIGHT * 0.9)
         ra.next_to(both, DOWN, buff=0.35)
         self.play(Write(ra))
         self.wait(0.8)
@@ -452,21 +494,21 @@ class S06_IntegrityCheck(WatermarkedScene):
         note1 = Text(
             "Row 1: alice borrowed 2021-01-01, but only joined 2021-08-15"
             " — a violation.",
-            font_size=17, color=BAD,
+            font_size=19, color=BAD,
         )
         note2 = Text(
             "Row 2: bob lent 2022-06-01, long after he joined in 2020"
             " — fine.",
-            font_size=17, color=GOOD,
+            font_size=19, color=GOOD,
         )
         notes = VGroup(note1, note2).arrange(DOWN, buff=0.15)
-        notes.next_to(ra, DOWN, buff=0.35)
+        notes.next_to(ra, DOWN, buff=0.3)
         self.play(FadeIn(notes, shift=UP * 0.2))
         self.wait(1.6)
 
         result = Text('result = { alice@nun.edu }  — should normally be'
-                       ' empty', font_size=20, color=HL)
-        result.next_to(notes, DOWN, buff=0.4)
+                       ' empty', font_size=22, color=HL)
+        result.next_to(notes, DOWN, buff=0.35)
         self.play(FadeIn(result, shift=UP * 0.2))
         self.wait(2)
 
@@ -488,17 +530,17 @@ class S07_SetupBO(WatermarkedScene):
             r"B = \pi_{\mathit{email}}\big(\sigma_{\,\mathit{email}="
             r"\mathit{borrower}\ \land\ \mathit{borrowed}=\mathit{year}}"
             r"(\text{student}\times\text{loan})\big)",
-            font_size=19,
+            font_size=24,
         )
         o_ra = ra_expr(
             r"O = \pi_{\mathit{email}}\big(\sigma_{\,\mathit{email}="
             r"\mathit{owner}\ \land\ \mathit{borrowed}=\mathit{year}}"
             r"(\text{student}\times\text{loan})\big)",
-            font_size=19,
+            font_size=24,
         )
-        b_cap = Text("B — borrowed on their own join day", font_size=18,
+        b_cap = Text("B — borrowed on their own join day", font_size=21,
                       color=ACCENT)
-        o_cap = Text("O — lent on their own join day", font_size=18,
+        o_cap = Text("O — lent on their own join day", font_size=21,
                       color=ACCENT)
         b_group = VGroup(b_cap, b_ra).arrange(DOWN, buff=0.15,
                                                 aligned_edge=LEFT)
@@ -524,7 +566,7 @@ class S07_SetupBO(WatermarkedScene):
         note = Text(
             "alice shows up in both — she borrowed AND lent on her own"
             " join day",
-            font_size=19, color=HL,
+            font_size=21, color=HL,
         )
         note.next_to(tables, DOWN, buff=0.4)
         self.play(FadeIn(note, shift=UP * 0.2))
@@ -544,22 +586,30 @@ class S08_SetOps(WatermarkedScene):
         heading.to_edge(UP)
         self.play(FadeIn(heading, shift=UP * 0.2))
 
+        subcap = Text(
+            "B, O fully defined on the previous slide — "
+            "π_email(σ_...(student × loan)) each",
+            font_size=17, color=GREY_C,
+        )
+        subcap.next_to(heading, DOWN, buff=0.2)
+        self.play(FadeIn(subcap))
+
         b_t = relation_table([["alice"], ["bob"]], ["email"], name="B",
                               scale=0.45, name_color=ACCENT)
         o_t = relation_table([["alice"], ["carol"]], ["email"], name="O",
                               scale=0.45, name_color=ACCENT)
         both = VGroup(b_t, o_t).arrange(RIGHT, buff=1.2)
-        both.next_to(heading, DOWN, buff=0.4)
+        both.next_to(subcap, DOWN, buff=0.35)
         self.play(Create(both))
         self.wait(0.5)
 
         def combo(sym_tex, op_sql, question, result_str, color):
-            sym = ra_expr(sym_tex, font_size=26, color=color)
-            sqlw = Text(op_sql, font=MONO_FONT, font_size=17, color=color)
-            q = Text(question, font_size=17, color=GREY_B)
-            res = Text(result_str, font_size=19, color=color, weight=BOLD)
-            group = VGroup(sym, sqlw, q, res).arrange(DOWN, buff=0.12)
-            box = SurroundingRectangle(group, color=color, buff=0.2,
+            sym = ra_expr(sym_tex, font_size=30, color=color)
+            sqlw = Text(op_sql, font=MONO_FONT, font_size=19, color=color)
+            q = Text(question, font_size=18, color=GREY_B)
+            res = Text(result_str, font_size=21, color=color, weight=BOLD)
+            group = VGroup(sym, sqlw, q, res).arrange(DOWN, buff=0.14)
+            box = SurroundingRectangle(group, color=color, buff=0.22,
                                         corner_radius=0.08, stroke_width=2)
             return VGroup(box, group)
 
@@ -577,7 +627,7 @@ class S08_SetOps(WatermarkedScene):
         note = Text(
             "Same two sets, three different set operators — three"
             " different questions.",
-            font_size=20, color=HL,
+            font_size=22, color=HL,
         )
         note.next_to(row, DOWN, buff=0.4)
         self.play(FadeIn(note, shift=UP * 0.2))
@@ -612,7 +662,7 @@ class S09_NeverBorrowed(WatermarkedScene):
         ra = ra_expr(
             r"\pi_{\,\mathit{ISBN13}}(\text{book}) \;-\; "
             r"\pi_{\,\mathit{book}}(\text{loan})",
-            font_size=26,
+            font_size=30,
         )
         ra.next_to(both, DOWN, buff=0.4)
         self.play(Write(ra))
@@ -620,7 +670,7 @@ class S09_NeverBorrowed(WatermarkedScene):
 
         calc = ra_expr(
             r"\{111,222,333\} - \{111,222\} = \{333\}",
-            font_size=24, color=HL,
+            font_size=27, color=HL,
         )
         calc.next_to(ra, DOWN, buff=0.35)
         self.play(FadeIn(calc, shift=UP * 0.2))
@@ -629,7 +679,7 @@ class S09_NeverBorrowed(WatermarkedScene):
         note = Text(
             "Equivalently: LEFT OUTER JOIN book with loan, then keep\n"
             "only the rows where the join found nothing (l.book IS NULL).",
-            font_size=19, color=GREY_B, line_spacing=1.3,
+            font_size=21, color=GREY_B, line_spacing=1.3,
         )
         note.next_to(calc, DOWN, buff=0.4)
         self.play(FadeIn(note, shift=UP * 0.2))
@@ -657,12 +707,12 @@ class S10_Takeaway(WatermarkedScene):
         ]
         rows = VGroup()
         for sqlw, ratex in pairs:
-            sq = Text(sqlw, font=MONO_FONT, font_size=22, color=ACCENT)
-            arrow = MathTex(r"\rightarrow", font_size=24, color=GREY_B)
-            ra = MathTex(ratex, font_size=26, color=HL)
+            sq = Text(sqlw, font=MONO_FONT, font_size=25, color=ACCENT)
+            arrow = MathTex(r"\rightarrow", font_size=27, color=GREY_B)
+            ra = MathTex(ratex, font_size=30, color=HL)
             row = VGroup(sq, arrow, ra).arrange(RIGHT, buff=0.4)
             rows.add(row)
-        rows.arrange(DOWN, buff=0.32, aligned_edge=LEFT)
+        rows.arrange(DOWN, buff=0.34, aligned_edge=LEFT)
         rows.next_to(heading, DOWN, buff=0.6)
         self.play(FadeIn(rows, lag_ratio=0.15))
         self.wait(2.2)
@@ -671,7 +721,7 @@ class S10_Takeaway(WatermarkedScene):
             "Every query in this tutorial is one of these, or several"
             " chained together —\nnothing here needed nesting or"
             " aggregation.",
-            font_size=21, color=WHITE, line_spacing=1.3,
+            font_size=23, color=WHITE, line_spacing=1.3,
         )
         note.next_to(rows, DOWN, buff=0.5)
         self.play(FadeIn(note, shift=UP * 0.2))

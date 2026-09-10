@@ -59,7 +59,7 @@ mkdir -p "$SITE_DIR/thumbs"
 cp "$FINAL" "$SITE_DIR/tut_03_relational_algebra.mp4"
 
 # Grab a thumbnail from the set-ops scene (2c/2d/2e side by side).
-ffmpeg -y -ss 00:01:29 -i "$FINAL" -frames:v 1 -vf "scale=480:-1" \
+ffmpeg -y -ss 00:01:33 -i "$FINAL" -frames:v 1 -vf "scale=480:-1" \
   "$SITE_DIR/thumbs/tut_03_relational_algebra.png"
 
 echo "Copied video + thumbnail into $SITE_DIR"
