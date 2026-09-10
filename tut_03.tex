@@ -1,0 +1,303 @@
+\documentclass{beamer}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,positioning,calc,fit}
+\usetikzlibrary{overlay-beamer-styles}
+\usepackage{booktabs,multicol,stackengine}
+\usepackage[table,dvipsnames]{xcolor}
+\usepackage{cancel}
+\usepackage{moresize}
+\usepackage{hyperref}
+
+\usepackage{listings}
+\definecolor{nus-orange}{RGB}{239,124,0}
+\definecolor{nus-blue}{RGB}{0,61,124}
+\definecolor{halfgray}{gray}{0.55}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries\color{nus-blue},
+  stringstyle=\color{ForestGreen},
+  numbers=left,
+  numberstyle=\scriptsize\color{halfgray},
+  rulesepcolor=\color{nus-orange},
+  frame=shadowbox,
+  columns=flexible,
+  showstringspaces=false,
+  keepspaces=true,
+  tabsize=2,
+  breaklines=true
+}
+
+\renewcommand{\figurename}{Figure}
+\renewcommand{\algorithmname}{Algorithm}
+
+\usepackage{SHU}
+\input{macros}
+
+\title{IT5008: Tutorial 3 --- Simple Queries}
+\author{\href{https://pratik2358.github.io/}{Pratik Karmakar}}
+\institute{School of Computing,\\ National University of Singapore}
+\date{AY26/27 S1}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \IfFileExists{nus-logo.png}{
+    \begin{figure}[htpb]\centering
+      \includegraphics[keepaspectratio, scale=0.18]{nus-logo.png}
+    \end{figure}
+  }{}
+\end{frame}
+
+\section{Scenario}
+
+\begin{frame}{The Book Exchange Schema (Recap)}
+\small
+Same NUN Book Exchange scenario, now in its \textbf{refactored} form (department pulled out, \texttt{available} dropped --- Tutorial 2's Q4).
+\begin{itemize}
+  \item \textbf{department}(\underline{department}, faculty)
+  \item \textbf{student}(name, \underline{email}, year, department \emph{(FK)}, graduate)
+  \item \textbf{book}(title, format, pages, language, author, publisher, pubdate, isbn10 \emph{(unique)}, \underline{ISBN13})
+  \item \textbf{copy}(\underline{owner}, \underline{book}, \underline{copy}) --- FKs to \texttt{student} and \texttt{book}
+  \item \textbf{loan}(borrower, owner, book, copy \emph{(FK to copy)}, borrowed, returned)
+\end{itemize}
+\medskip
+\begin{block}{Simple queries only}
+No \textbf{nested} or \textbf{aggregate} queries in your answers this tutorial. Focus on \textbf{single-table} and \textbf{multi-table} joins, plus the set operators \texttt{UNION}/\texttt{INTERSECT}/\texttt{EXCEPT}.
+\end{block}
+\end{frame}
+
+\section{Single-Table Queries}
+
+\begin{frame}{Preliminary: Single-Table Queries}
+\small
+\textit{Not discussed in class --- attempt before the tutorial, since later questions build on these.}
+\begin{enumerate}
+  \item[(a)] Print the different departments.
+  \item[(b)] Print the different departments in which students are enrolled.
+  \item[(c)] For each copy that has been borrowed and returned, print the ISBN-13 of the book and the duration of the loan. Order by ISBN-13 (ascending), then duration (descending). Use a \textbf{single} table.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{1(a). Different Departments}
+\small
+\begin{lstlisting}[language=SQL]
+SELECT d.department
+FROM department d;
+\end{lstlisting}
+\textbf{Why no \texttt{DISTINCT}?} \texttt{department} is the \textbf{PRIMARY KEY} of the table \texttt{department} --- duplicates cannot occur.
+\end{frame}
+
+\begin{frame}[fragile]{1(b). Departments With Enrolled Students}
+\small
+Now we query \texttt{student}: many students can share a department, so we \textbf{do} need \texttt{DISTINCT}.
+\begin{lstlisting}[language=SQL]
+SELECT DISTINCT s.department
+FROM student s;
+\end{lstlisting}
+\textbf{Wording matters.} This asks for ``the different \emph{departments}''. Had it instead asked for ``the department of the different \emph{students}'', \texttt{DISTINCT} would be misplaced --- students are already unique by \texttt{email}, so the (wrong-question) query would just be:
+\begin{lstlisting}[language=SQL]
+SELECT s.department
+FROM student s;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{1(c). Loan Duration, Single Table}
+\small
+Only \texttt{loan} is needed. A loan not yet returned has no fixed duration yet --- treat it as running until today with \texttt{COALESCE}.
+\begin{lstlisting}[language=SQL]
+SELECT l.book,
+  (COALESCE(l.returned, CURRENT_DATE) - l.borrowed + 1) AS duration
+FROM loan l
+ORDER BY l.book ASC, duration DESC;
+\end{lstlisting}
+\textbf{Equivalently, with \texttt{CASE}:}
+\begin{lstlisting}[language=SQL]
+SELECT l.book,
+  ((CASE WHEN l.returned IS NULL THEN CURRENT_DATE
+         ELSE l.returned END) - l.borrowed + 1) AS duration
+FROM loan l
+ORDER BY l.book ASC, duration DESC;
+\end{lstlisting}
+\end{frame}
+
+\section{Multi-Table Queries}
+
+\begin{frame}{Discussion: Multi-Table Queries}
+\footnotesize
+\textit{To be discussed in class --- attempt before the tutorial; you may be called on to present.}
+\begin{enumerate}
+  \item[(a)] For each unreturned loan of a book published by \texttt{'Wiley'}, print the book's title, the owner's name and faculty, and the borrower's name and faculty.
+  \item[(b)] \textbf{Integrity check.} Print the distinct emails of students who borrowed or lent a copy \textbf{before} they joined the university. There should not be any.
+  \item[(c)] Print the distinct emails of students who borrowed or lent a copy \textbf{on the day} they joined.
+  \item[(d)] Print the distinct emails of students who borrowed \textbf{and} lent a copy \textbf{on the day} they joined.
+  \item[(e)] Print the distinct emails of students who borrowed \textbf{but did not lend} a copy \textbf{on the day} they joined.
+  \item[(f)] Print the distinct ISBN-13 of books that have \textbf{never} been borrowed.
+\end{enumerate}
+\end{frame}
+
+\section{Solutions}
+
+\begin{frame}[fragile]{2(a). Unreturned Wiley Loans --- via \texttt{copy}}
+\small
+We stitch tables together by joining each \textbf{FOREIGN KEY} to the \textbf{PRIMARY KEY} it references.
+\begin{lstlisting}[language=SQL]
+SELECT b.title,
+  s1.name AS ownerName,    d1.faculty AS ownerFaculty,
+  s2.name AS borrowerName, d2.faculty AS borrowerFaculty
+FROM loan l, book b, copy c,
+  student s1, student s2, department d1, department d2
+WHERE l.book = b.ISBN13
+  AND c.book = l.book AND c.copy = l.copy AND c.owner = l.owner
+  AND l.owner = s1.email AND l.borrower = s2.email
+  AND s1.department = d1.department
+  AND s2.department = d2.department
+  AND b.publisher = 'Wiley' AND l.returned ISNULL;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{2(a). ...and Why We Should Drop \texttt{copy}}
+\small
+The \texttt{copy} row referenced by \texttt{loan}'s (owner, book, copy) already \textbf{must} exist --- that's exactly what the \texttt{loan} $\to$ \texttt{copy} foreign key guarantees. Joining to \texttt{copy} only to discard it is a \textbf{redundant table}.
+\begin{lstlisting}[language=SQL]
+SELECT b.title,
+  s1.name AS ownerName,    d1.faculty AS ownerFaculty,
+  s2.name AS borrowerName, d2.faculty AS borrowerFaculty
+FROM loan l, book b,               -- no more copy table
+  student s1, student s2, department d1, department d2
+WHERE l.book = b.ISBN13
+  AND l.owner = s1.email AND l.borrower = s2.email
+  AND s1.department = d1.department
+  AND s2.department = d2.department
+  AND b.publisher = 'Wiley' AND l.returned ISNULL;
+\end{lstlisting}
+\textbf{You can and should} omit tables/columns whose values are already guaranteed by the schema --- redundant tables may be penalized.
+\end{frame}
+
+\begin{frame}[fragile]{2(a). ...or With \texttt{INNER JOIN}}
+\small
+\begin{lstlisting}[language=SQL]
+SELECT b.title,
+  s1.name AS ownerName,    d1.faculty AS ownerFaculty,
+  s2.name AS borrowerName, d2.faculty AS borrowerFaculty
+FROM loan l
+INNER JOIN book       b  ON l.book = b.ISBN13
+INNER JOIN student    s1 ON l.owner = s1.email
+INNER JOIN student    s2 ON l.borrower = s2.email
+INNER JOIN department d1 ON s1.department = d1.department
+INNER JOIN department d2 ON s2.department = d2.department
+WHERE b.publisher = 'Wiley' AND l.returned ISNULL;
+\end{lstlisting}
+\textbf{Convention:} put PK--FK join predicates in \texttt{ON}; put everything else in \texttt{WHERE}.
+\end{frame}
+
+\begin{frame}[fragile]{2(b). Integrity Check --- Borrowed/Lent Before Joining}
+\small
+Either role (\texttt{owner} or \texttt{borrower}), compared against the student's join date.
+\begin{lstlisting}[language=SQL]
+SELECT DISTINCT s.email
+FROM loan l, student s
+WHERE (s.email = l.borrower OR s.email = l.owner)
+  AND l.borrowed < s.year;
+\end{lstlisting}
+This should return \textbf{no rows} --- a student cannot lend or borrow before enrolling. (In practice, some rows in the current dataset violate this: a data-quality issue, not a query bug.) \texttt{INNER JOIN} or \texttt{UNION} work equally well here.
+\end{frame}
+
+\begin{frame}[fragile]{2(c). Borrowed \emph{or} Lent \emph{on} Joining Day}
+\small
+\textbf{Via \texttt{UNION}} (dedupes automatically --- no \texttt{DISTINCT} needed):
+\begin{lstlisting}[language=SQL]
+SELECT s.email FROM loan l, student s
+WHERE s.email = l.borrower AND l.borrowed = s.year
+UNION
+SELECT s.email FROM loan l, student s
+WHERE s.email = l.owner AND l.borrowed = s.year;
+\end{lstlisting}
+\textbf{Equivalently, via \texttt{OR}} (needs \texttt{DISTINCT}):
+\begin{lstlisting}[language=SQL]
+SELECT DISTINCT s.email
+FROM loan l, student s
+WHERE (s.email = l.borrower OR s.email = l.owner)
+  AND l.borrowed = s.year;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{2(d). Borrowed \emph{and} Lent \emph{on} Joining Day}
+\small
+\textbf{Via \texttt{INTERSECT}:}
+\begin{lstlisting}[language=SQL]
+SELECT s.email FROM loan l, student s
+WHERE s.email = l.borrower AND l.borrowed = s.year
+INTERSECT
+SELECT s.email FROM loan l, student s
+WHERE s.email = l.owner AND l.borrowed = s.year;
+\end{lstlisting}
+\textbf{Equivalently, without \texttt{INTERSECT}} --- two aliases of \texttt{loan}, one fact per role:
+\begin{lstlisting}[language=SQL]
+SELECT DISTINCT s.email
+FROM loan l1, loan l2, student s
+WHERE s.email = l1.borrower AND l1.borrowed = s.year
+  AND s.email = l2.owner    AND l2.borrowed = s.year;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{2(e). Borrowed \emph{but Not} Lent \emph{on} Joining Day}
+\small
+\begin{lstlisting}[language=SQL]
+SELECT s.email FROM loan l, student s
+WHERE s.email = l.borrower AND l.borrowed = s.year
+EXCEPT
+SELECT s.email FROM loan l, student s
+WHERE s.email = l.owner AND l.borrowed = s.year;
+\end{lstlisting}
+Unlike 2(d), there is \textbf{no simple-query alternative} here --- ``but not'' needs \texttt{EXCEPT} (or, outside this tutorial's rules, a nested/aggregate query).
+\end{frame}
+
+\begin{frame}[fragile]{2(f). Books Never Borrowed}
+\small
+\textbf{Via \texttt{EXCEPT}:}
+\begin{lstlisting}[language=SQL]
+SELECT b.ISBN13 FROM book b
+EXCEPT
+SELECT l.book FROM loan l;
+\end{lstlisting}
+\textbf{Via \texttt{LEFT OUTER JOIN}} --- unmatched books get \texttt{NULL} for \texttt{l.book}, so we filter on that:
+\begin{lstlisting}[language=SQL]
+SELECT b.ISBN13
+FROM book b LEFT OUTER JOIN loan l ON b.ISBN13 = l.book
+WHERE l.book ISNULL;
+\end{lstlisting}
+There happens to be no such book in the current dataset --- the query must still be correct for \emph{any} dataset satisfying the schema.
+\end{frame}
+
+\section{Guidelines}
+
+\begin{frame}{Guidelines \& Marking Tips}
+\small
+\begin{itemize}\itemsep4pt
+  \item \textbf{No hardcoding.} A query must work on \emph{any} dataset consistent with the schema --- we test against other datasets too.
+  \item \textbf{Constants only if the question names one.} \texttt{'Wiley'} is fine because 2(a) says so; don't introduce constants of your own.
+  \item \textbf{Readable style.} Alias every table, qualify every column, and uppercase SQL keywords.
+  \item \textbf{Set operators dedupe already.} \texttt{UNION}/\texttt{INTERSECT}/\texttt{EXCEPT} remove duplicates automatically --- a \texttt{DISTINCT} on top of one is redundant.
+  \item \textbf{Partial marks} require: (i) the query executes, (ii) columns are correct (names, types, order), and (iii) row differences are minimal. A query that fails to execute may receive \textbf{0}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+Questions?\\
+Drop a mail at: pratik.karmakar@u.nus.edu
+\end{center}
+\end{frame}
+
+\end{document}
