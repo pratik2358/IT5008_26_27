@@ -1,0 +1,323 @@
+\documentclass{beamer}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,positioning,calc,fit}
+\usetikzlibrary{overlay-beamer-styles}
+\usepackage{booktabs,multicol,stackengine}
+\usepackage[table,dvipsnames]{xcolor}
+\usepackage{cancel}
+\usepackage{moresize}
+\usepackage{hyperref}
+
+\usepackage{listings}
+\definecolor{nus-orange}{RGB}{239,124,0}
+\definecolor{nus-blue}{RGB}{0,61,124}
+\definecolor{halfgray}{gray}{0.55}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries\color{nus-blue},
+  stringstyle=\color{ForestGreen},
+  numbers=left,
+  numberstyle=\scriptsize\color{halfgray},
+  rulesepcolor=\color{nus-orange},
+  frame=shadowbox,
+  columns=flexible,
+  showstringspaces=false,
+  keepspaces=true,
+  tabsize=2,
+  breaklines=true
+}
+
+\renewcommand{\figurename}{Figure}
+\renewcommand{\algorithmname}{Algorithm}
+
+\usepackage{SHU}
+\input{macros}
+
+% Relational algebra operators
+\newcommand\proj[1]{\pi_{[\text{#1}]}}
+\newcommand\sel[1]{\sigma_{[\text{#1}]}}
+\newcommand\ren[2]{\rho(\text{#1},\text{#2})}
+\newcommand\njoin[1]{\bowtie_{[\text{#1}]}}
+\newcommand\AND{\wedge}
+\newcommand\OR{\vee}
+
+\title{IT5008: Tutorial 5 --- Relational Algebra}
+\author{\href{https://pratik2358.github.io/}{Pratik Karmakar}}
+\institute{School of Computing,\\ National University of Singapore}
+\date{AY26/27 S1}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \IfFileExists{nus-logo.png}{
+    \begin{figure}[htpb]\centering
+      \includegraphics[keepaspectratio, scale=0.18]{nus-logo.png}
+    \end{figure}
+  }{}
+\end{frame}
+
+\section{Scenario}
+
+\begin{frame}{The Book Exchange Schema (Recap)}
+\small
+Same NUN Book Exchange scenario and schema as Tutorials 3 and 4.
+\begin{itemize}
+  \item \textbf{department}(\underline{department}, faculty)
+  \item \textbf{student}(name, \underline{email}, year, department \emph{(FK)}, graduate)
+  \item \textbf{book}(title, format, pages, language, authors, publisher, year, edition, ISBN10 \emph{(unique)}, \underline{ISBN13})
+  \item \textbf{copy}(\underline{owner}, \underline{book}, \underline{copy}) --- FKs to \texttt{student} and \texttt{book}
+  \item \textbf{loan}(borrower, owner, book, copy, borrowed, returned)
+\end{itemize}
+\medskip
+\begin{block}{New this tutorial}
+Writing queries as \textbf{relational algebra} expressions, and translating them to/from SQL --- including \textbf{universal quantification} without \texttt{NOT EXISTS}.
+\end{block}
+\end{frame}
+
+\begin{frame}{Relational Algebra Cheat Sheet}
+\small
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lll}
+\toprule
+\textbf{Operator} & \textbf{Notation} & \textbf{SQL counterpart} \\
+\midrule
+Rename    & $\rho(R, r)$              & \texttt{FROM R r} \\
+Selection & $\sigma_{[c]}(R)$         & \texttt{WHERE c} \\
+Projection& $\pi_{[a_1,\ldots]}(R)$   & \texttt{SELECT DISTINCT a1, \ldots} \\
+Cross product & $R \times S$          & \texttt{FROM R, S} \\
+Join      & $R \bowtie_{[c]} S$       & \texttt{FROM R, S WHERE c} \\
+Union / Difference & $R \cup S$, $R - S$ & \texttt{UNION}, \texttt{EXCEPT} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+\begin{itemize}
+  \item Relational algebra works on \textbf{sets}: $\pi$ removes duplicates automatically --- hence \texttt{DISTINCT} (or a set operator) in the SQL.
+  \item $R \bowtie_{[c]} S \equiv \sigma_{[c]}(R \times S)$.
+  \item $\cup$ and $-$ need \textbf{union-compatible} inputs (same number and types of columns).
+\end{itemize}
+\end{frame}
+
+\section{Preliminary Questions}
+
+\begin{frame}{Preliminary: Basic Relational Algebra}
+\small
+\textit{Not discussed in class --- attempt before the tutorial, since later questions build on these.}
+\begin{enumerate}
+  \item[\textbf{1.}] \textbf{Basic Relational Algebra.}
+  \begin{enumerate}
+    \item[(a)] Find the different departments in the School of Computing.
+    \item[(b)] Print the emails of the students who \emph{borrowed} but did \emph{not lend} a copy of a book on the day that they joined the university.
+  \end{enumerate}
+\end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{1(a). Departments in the School of Computing}
+\small
+Rename, select the faculty, project the department.
+\[
+\proj{d.department}\Big(\sel{d.faculty = 'School of Computing'}\big(\ren{department}{d}\big)\Big)
+\]
+\begin{lstlisting}[language=SQL]
+SELECT d.department
+FROM department d
+WHERE d.faculty = 'School of Computing';
+\end{lstlisting}
+\texttt{department} is the primary key, so no duplicates can arise --- no \texttt{DISTINCT} needed.
+\end{frame}
+
+\begin{frame}[fragile]{1(b). Borrowed but Did Not Lend on Joining Day}
+\footnotesize
+``Borrowed on day one'' \textbf{minus} ``lent on day one'' --- a set difference.
+\[
+\begin{aligned}
+&\proj{s1.email}\Big(\sel{s1.email = l1.borrower $\wedge$ l1.borrowed = s1.year}\big(\ren{student}{s1} \times \ren{loan}{l1}\big)\Big)\\
+-\ &\proj{s2.email}\Big(\sel{s2.email = l2.owner $\wedge$ l2.borrowed = s2.year}\big(\ren{student}{s2} \times \ren{loan}{l2}\big)\Big)
+\end{aligned}
+\]
+\begin{lstlisting}[language=SQL]
+SELECT s1.email
+FROM loan l1, student s1
+WHERE s1.email = l1.borrower AND l1.borrowed = s1.year
+EXCEPT
+SELECT s2.email
+FROM loan l2, student s2
+WHERE s2.email = l2.owner AND l2.borrowed = s2.year;
+\end{lstlisting}
+\texttt{EXCEPT} is a set operator: it already removes duplicates.
+\end{frame}
+
+\section{Discussion Questions}
+
+\begin{frame}{Discussion: Integrity Check \& Universal Quantification}
+\small
+\textit{To be discussed in class --- attempt before the tutorial; you may be called on to present.}
+\begin{enumerate}
+  \item[\textbf{2.}] \textbf{Relational Algebra.} Let us check the integrity of the data. Find the different emails of the students who borrowed \emph{or} lent a copy of a book \emph{before} they joined the university. There should not be any.
+  \begin{enumerate}
+    \item[(a)] Solve the problem \textbf{with} a set operation.
+    \item[(b)] Solve the problem \textbf{without} a set operation.
+  \end{enumerate}
+  \item[\textbf{3.}] \textbf{Universal Quantification.} Print the emails and the names of the different students who borrowed \emph{all} the books authored by Adam Smith.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{2(a). Integrity Check --- With a Set Operation}
+\footnotesize
+``Borrowed too early'' \textbf{or} ``lent too early'' --- a union.
+\[
+\begin{aligned}
+&\proj{s1.email}\Big(\sel{s1.email = l1.borrower $\wedge$ l1.borrowed $<$ s1.year}\big(\ren{student}{s1} \times \ren{loan}{l1}\big)\Big)\\
+\cup\ &\proj{s2.email}\Big(\sel{s2.email = l2.owner $\wedge$ l2.borrowed $<$ s2.year}\big(\ren{student}{s2} \times \ren{loan}{l2}\big)\Big)
+\end{aligned}
+\]
+\begin{lstlisting}[language=SQL]
+SELECT s1.email
+FROM loan l1, student s1
+WHERE s1.email = l1.borrower AND l1.borrowed < s1.year
+UNION
+SELECT s2.email
+FROM loan l2, student s2
+WHERE s2.email = l2.owner AND l2.borrowed < s2.year;
+\end{lstlisting}
+Compare with 1(b): same shape, but $-$ becomes $\cup$ and $=$ becomes $<$.
+\end{frame}
+
+\begin{frame}[fragile]{2(b). Integrity Check --- Without a Set Operation}
+\small
+Fold the ``or'' into a \textbf{single selection} with a disjunction.
+\[
+\begin{aligned}
+\proj{s.email}\Big(&\sel{(s.email = l.borrower $\vee$ s.email = l.owner) $\wedge$ l.borrowed $<$ s.year}\\
+&\quad\big(\ren{student}{s} \times \ren{loan}{l}\big)\Big)
+\end{aligned}
+\]
+\begin{lstlisting}[language=SQL]
+SELECT DISTINCT s.email
+FROM student s, loan l
+WHERE (s.email = l.borrower OR s.email = l.owner)
+  AND l.borrowed < s.year;
+\end{lstlisting}
+\begin{itemize}
+  \item \textbf{\texttt{DISTINCT} is now required}: without a set operator, SQL keeps duplicates, but $\pi$ does not.
+  \item \textbf{Mind the parentheses}: \texttt{AND} binds tighter than \texttt{OR}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{3. Borrowed \emph{All} of Adam Smith's Books}
+\small
+In Tutorial 4 we wrote this with a \textbf{double \texttt{NOT EXISTS}}. But \texttt{NOT EXISTS} has no direct relational algebra counterpart --- we need to rephrase it with \textbf{set difference}.
+\medskip
+
+\textbf{Break it down:}
+\begin{enumerate}
+  \item Find the students for whom there is \textbf{at least one} Adam Smith book they have \emph{not} borrowed.
+  \item Answer $=$ \textbf{all} students (including those who borrowed nothing) \textbf{minus} the students from Step 1.
+\end{enumerate}
+\medskip
+\textbf{Step 1, split further:}
+\begin{enumerate}
+  \item[A.] Every \emph{possible} (student, Adam Smith book) pair --- a cross product.
+  \item[B.] Every \emph{actual} (student, Adam Smith book) borrowing --- a join with \texttt{loan}.
+  \item[C.] A $-$ B are the \textbf{missing} pairs; project to keep only email and name.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{3. The Relational Algebra}
+\scriptsize
+We use $\coloneqq$ to name sub-expressions we refer to later.
+\[
+\begin{aligned}
+Q_{1A} &\coloneqq \proj{s1.email, s1.name}\big(\ren{student}{s1}\big)\\
+       &\qquad \times \proj{b1.ISBN13}\Big(\sel{b1.authors = 'Adam Smith'}\big(\ren{book}{b1}\big)\Big)\\[4pt]
+Q_{1B} &\coloneqq \proj{s2.email, s2.name, b2.ISBN13}\Big(\ren{loan}{l2}\\
+       &\qquad \njoin{l2.book = b2.ISBN13 $\wedge$ b2.authors = 'Adam Smith'} \ren{book}{b2}\\
+       &\qquad \njoin{l2.borrower = s2.email} \ren{student}{s2}\Big)\\[4pt]
+Q_{1} &\coloneqq \proj{s2.email, s2.name}\big(Q_{1A} - Q_{1B}\big)\\[4pt]
+Q_{2} &\coloneqq \proj{s3.email, s3.name}\big(\ren{student}{s3}\big) - Q_1
+\end{aligned}
+\]
+\medskip
+\begin{itemize}
+  \item $Q_{1A}$ and $Q_{1B}$ are \textbf{union-compatible}: both are (email, name, ISBN13).
+  \item $Q_{1A} - Q_{1B}$: the (student, book) pairs that \emph{should} exist but \emph{don't}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{3. Translating Back to SQL}
+\footnotesize
+Each $-$ becomes an \texttt{EXCEPT}; $Q_1$ becomes a subquery in \texttt{FROM}.
+\begin{lstlisting}[language=SQL,basicstyle=\ttfamily\scriptsize]
+SELECT s3.email, s3.name
+FROM student s3
+EXCEPT
+SELECT tmp.email, tmp.name
+FROM (
+  SELECT s1.email, s1.name, b1.ISBN13       -- Q1A
+  FROM student s1, book b1
+  WHERE b1.authors = 'Adam Smith'
+  EXCEPT
+  SELECT s2.email, s2.name, b2.ISBN13       -- Q1B
+  FROM student s2, book b2, loan l2
+  WHERE b2.authors = 'Adam Smith'
+    AND s2.email = l2.borrower
+    AND b2.ISBN13 = l2.book
+) AS tmp;
+\end{lstlisting}
+Same answer as Tutorial 4's double-\texttt{NOT EXISTS} query: ``no Adam Smith book is missing from $s$'s loans.''
+\end{frame}
+
+\begin{frame}{3. Why This Is the Same as \texttt{NOT EXISTS}}
+\small
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{ll}
+\toprule
+\textbf{Nested SQL (Tut 4)} & \textbf{Relational algebra (Tut 5)} \\
+\midrule
+inner \texttt{NOT EXISTS} (no loan of $b$ by $s$) & $Q_{1A} - Q_{1B}$ \\
+outer \texttt{NOT EXISTS} (no such $b$ for $s$) & $\pi(\text{student}) - Q_1$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+\begin{itemize}
+  \item $\forall b\,.\,\text{borrowed}(s,b) \;\equiv\; \neg\exists b\,.\,\neg\text{borrowed}(s,b)$
+  \item Each \textbf{negation} becomes a \textbf{set difference} against the set of all candidates.
+  \item Students who borrowed \emph{nothing} still appear in $Q_{1A}$ (via the cross product), so they correctly land in $Q_1$ and are excluded --- unless Adam Smith has no books, in which case \textbf{every} student qualifies (vacuous truth).
+\end{itemize}
+\end{frame}
+
+\section{Guidelines}
+
+\begin{frame}{Guidelines \& Common Pitfalls}
+\small
+\begin{itemize}\itemsep4pt
+  \item \textbf{Sets vs.\ bags.} $\pi$ eliminates duplicates; a plain SQL \texttt{SELECT} does not. Add \texttt{DISTINCT} unless a set operator (or a key) already guarantees uniqueness (1(a), 2(b)).
+  \item \textbf{``or'' $\to \cup$ or $\vee$; ``but not'' $\to -$.} Either a set operator between two queries, or a combined condition inside one $\sigma$ (Q2).
+  \item \textbf{Parenthesise disjunctions.} \texttt{(A OR B) AND C} $\neq$ \texttt{A OR B AND C} (2(b)).
+  \item \textbf{``For all'' has no single operator.} Build all candidates ($\times$), remove what actually happened ($-$), then remove the failures from everyone ($-$ again) (Q3).
+  \item \textbf{Union-compatibility.} Both sides of $\cup$ / $-$ must have the same columns --- keep \texttt{ISBN13} in $Q_{1A}$ and $Q_{1B}$ \emph{until after} the difference.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+Questions?\\
+Drop a mail at: pratik.karmakar@u.nus.edu
+\end{center}
+\end{frame}
+
+\end{document}
