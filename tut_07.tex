@@ -1,0 +1,398 @@
+\documentclass{beamer}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,positioning,calc,fit}
+\usetikzlibrary{overlay-beamer-styles}
+\usepackage{booktabs,multicol,stackengine}
+\usepackage[table,dvipsnames]{xcolor}
+\usepackage{cancel}
+\usepackage{moresize}
+\usepackage{hyperref}
+
+\usepackage{listings}
+\definecolor{nus-orange}{RGB}{239,124,0}
+\definecolor{nus-blue}{RGB}{0,61,124}
+\definecolor{halfgray}{gray}{0.55}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\bfseries\color{nus-blue},
+  stringstyle=\color{ForestGreen},
+  commentstyle=\color{halfgray}\itshape,
+  numbers=left,
+  numberstyle=\scriptsize\color{halfgray},
+  rulesepcolor=\color{nus-orange},
+  frame=shadowbox,
+  columns=flexible,
+  showstringspaces=false,
+  keepspaces=true,
+  tabsize=2,
+  breaklines=true
+}
+% PL/pgSQL keywords on top of the SQL dialect
+\lstdefinelanguage{plpgsql}[]{SQL}{
+  morekeywords={RETURNS,TRIGGER,DECLARE,BEGIN,END,IF,THEN,ELSE,RETURN,
+    RAISE,EXCEPTION,REPLACE,FUNCTION,EXECUTE,BEFORE,AFTER,EACH,ROW,
+    CONSTRAINT,DEFERRABLE,INITIALLY,DEFERRED,LANGUAGE,RECORD,NEW,OLD,
+    EXISTS,ISNULL,CASCADE,SCHEMA},
+  morecomment=[l]{--},
+  morecomment=[s]{/*}{*/},
+}
+
+\renewcommand{\figurename}{Figure}
+\renewcommand{\algorithmname}{Algorithm}
+
+\usepackage{SHU}
+\input{macros}
+
+\title{IT5008: Tutorial 7 --- Triggers}
+\author{\href{https://pratik2358.github.io/}{Pratik Karmakar}}
+\institute{School of Computing,\\ National University of Singapore}
+\date{AY26/27 S1}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \IfFileExists{nus-logo.png}{
+    \begin{figure}[htpb]\centering
+      \includegraphics[keepaspectratio, scale=0.18]{nus-logo.png}
+    \end{figure}
+  }{}
+\end{frame}
+
+\section{Scenario}
+
+\begin{frame}{The Book Exchange Schema (Recap)}
+\small
+Same NUN Book Exchange scenario as before; the discussion questions use:
+\begin{itemize}
+  \item \textbf{student}(name, \underline{email}, year, department, graduate) --- with \texttt{CHECK(graduate >= year)}
+  \item \textbf{loan}(borrower, owner, book, copy, borrowed, returned) --- \texttt{returned IS NULL} means \emph{still out}
+\end{itemize}
+The preliminary questions use two small, separate schemas (employees; projects).
+\medskip
+\begin{block}{New this tutorial}
+\textbf{Triggers}: PL/pgSQL functions that run automatically on \texttt{INSERT}/\texttt{UPDATE}/\texttt{DELETE} --- to enforce constraints that \texttt{CHECK}, keys and foreign keys cannot express, or to \emph{repair} a row instead of rejecting it.
+\end{block}
+\end{frame}
+
+\begin{frame}{Trigger Cheat Sheet (Row-Level)}
+\footnotesize
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{0.2\linewidth}p{0.34\linewidth}p{0.34\linewidth}}
+\toprule
+ & \textbf{\texttt{BEFORE}} & \textbf{\texttt{AFTER}} \\
+\midrule
+Runs & before the row is written & after the row is written \\
+\texttt{RETURN NEW} & write the row (possibly \emph{modified}) & ignored \\
+\texttt{RETURN NULL} & \textbf{silently skip} this row & ignored \\
+\texttt{RAISE EXCEPTION} & abort the statement & abort the statement \\
+Good for & reject or \textbf{fix up} one row & check the \textbf{resulting state} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{itemize}
+  \item \texttt{NEW} / \texttt{OLD}: the row after / before the change.
+  \item \texttt{CREATE CONSTRAINT TRIGGER \ldots\ DEFERRABLE INITIALLY DEFERRED}: an \texttt{AFTER} trigger that runs at \textbf{\texttt{COMMIT}}, so a transaction may pass through invalid intermediate states.
+  \item A trigger function must reach a \texttt{RETURN} (or raise) --- even when the value is ignored.
+\end{itemize}
+\end{frame}
+
+\section{Preliminary Questions}
+
+\begin{frame}{Preliminary: Triggers}
+\small
+\textit{Not discussed in class --- attempt before the tutorial, since later questions build on these.}
+\begin{enumerate}
+  \item[\textbf{1.}] \textbf{Triggers.}
+  \begin{enumerate}
+    \item[(a)] \texttt{Employees(\underline{eid}, name)}, \texttt{Engineers(\underline{eid}, skill)}, \texttt{Managers(\underline{eid}, dept)}; both subclasses reference \texttt{Employees.eid}.\\
+    No employee can be \textbf{both} an engineer and a manager.
+    \item[(b)] \texttt{Engineers(\underline{eid}, skill)}, \texttt{Projects(\underline{pid}, max\_hours)}, \texttt{Work(\underline{eid, pid}, hour)}; \texttt{Work} references both.\\
+    The total \texttt{hour} worked on a project cannot exceed its \texttt{max\_hours}.
+  \end{enumerate}
+\end{enumerate}
+\medskip
+Enforce each with triggers.
+\end{frame}
+
+\begin{frame}[fragile,shrink=6]{1(a). Engineers Must Not Be Managers}
+\footnotesize
+{\scriptsize \textbf{Schema:} \texttt{Employees(\underline{eid}, name)}, \texttt{Engineers(\underline{eid}, skill)}, \texttt{Managers(\underline{eid}, dept)}\\
+\textbf{FKs:} \texttt{Engineers.eid} $\to$ \texttt{Employees.eid}, \ \texttt{Managers.eid} $\to$ \texttt{Employees.eid}}
+\medskip
+
+A \texttt{BEFORE} trigger that \textbf{skips} the row (\texttt{RETURN NULL}) if the employee is already a manager.
+\begin{lstlisting}[language=plpgsql]
+CREATE OR REPLACE FUNCTION not_manager()
+RETURNS TRIGGER AS $$
+DECLARE
+  count NUMERIC;
+BEGIN
+  SELECT COUNT(*) INTO count
+  FROM Managers
+  WHERE NEW.eid = Managers.eid;
+  IF count > 0 THEN
+    RETURN NULL;
+  ELSE
+    RETURN NEW;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER non_manager
+BEFORE INSERT OR UPDATE ON Engineers
+FOR EACH ROW EXECUTE FUNCTION not_manager();
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile,shrink=6]{1(a). \ldots and Managers Must Not Be Engineers}
+\footnotesize
+The reference solution leaves this as an exercise. Without it, \texttt{INSERT INTO Managers} for an existing engineer still \textbf{succeeds}.
+\begin{lstlisting}[language=plpgsql]
+CREATE OR REPLACE FUNCTION not_engineer()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF EXISTS (SELECT * FROM Engineers e WHERE e.eid = NEW.eid) THEN
+    RETURN NULL;
+  ELSE
+    RETURN NEW;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER non_engineer
+BEFORE INSERT OR UPDATE ON Managers
+FOR EACH ROW EXECUTE FUNCTION not_engineer();
+\end{lstlisting}
+\begin{itemize}
+  \item A constraint across two tables needs a trigger on \textbf{each} table that can break it.
+  \item \texttt{RETURN NULL} rejects \emph{silently} (\texttt{INSERT 0 0}); use \texttt{RAISE EXCEPTION} if the caller should know.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,shrink=4]{1(b). Project Hours Must Not Exceed \texttt{max\_hours}}
+\footnotesize
+{\scriptsize \textbf{Schema:} \texttt{Engineers(\underline{eid}, skill)}, \texttt{Projects(\underline{pid}, max\_hours)}, \texttt{Work(\underline{eid, pid}, hour)}\\
+\textbf{FKs:} \texttt{Work.eid} $\to$ \texttt{Engineers.eid}, \ \texttt{Work.pid} $\to$ \texttt{Projects.pid}\\
+\textbf{Rule:} for each project, \texttt{SUM(hour)} over its \texttt{Work} rows $\le$ \texttt{max\_hours}.}
+\begin{lstlisting}[language=plpgsql]
+CREATE OR REPLACE FUNCTION not_exceeded()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM Projects p, Work w
+    WHERE p.pid = w.pid
+    GROUP BY p.pid
+    HAVING SUM(w.hour) > p.max_hours
+  ) THEN
+    RAISE EXCEPTION 'Hours exceeded!';
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+\end{lstlisting}
+\textbf{Look for violations}: any project whose total hours exceed its limit.
+\end{frame}
+
+\begin{frame}[fragile]{1(b). The Triggers}
+\small
+\begin{lstlisting}[language=plpgsql]
+CREATE CONSTRAINT TRIGGER project_limit
+AFTER INSERT OR UPDATE ON Projects
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION not_exceeded();
+
+CREATE CONSTRAINT TRIGGER work_limit
+AFTER INSERT OR UPDATE ON Work
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION not_exceeded();
+\end{lstlisting}
+\begin{itemize}
+  \item \texttt{CONSTRAINT TRIGGER} + \texttt{DEFERRABLE INITIALLY DEFERRED}: the check runs at \texttt{COMMIT}.
+  \item One trigger per table that can break the rule (next slide: why).
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{1(b). Why Two Deferred Triggers?}
+\small
+\begin{itemize}
+  \item \textbf{Both tables can break it:} adding/updating \texttt{Work} raises the total; updating \texttt{Projects} can lower \texttt{max\_hours} below it.
+  \item \textbf{Deferred to \texttt{COMMIT}:} the check looks at the \emph{whole} database, so we let a transaction finish its changes before checking.
+\end{itemize}
+\begin{lstlisting}[language=plpgsql]
+BEGIN;
+INSERT INTO Projects VALUES (1, 10);
+INSERT INTO Work VALUES (1, 1, 5);
+COMMIT;                -- OK: 5 <= 10
+
+BEGIN;
+INSERT INTO Projects VALUES (2, 10);
+INSERT INTO Work VALUES (1, 2, 50);
+COMMIT;                -- ERROR: Hours exceeded!
+
+UPDATE Projects SET max_hours = 4 WHERE pid = 1;
+                       -- ERROR: Hours exceeded!
+\end{lstlisting}
+\end{frame}
+
+\section{Discussion Questions}
+
+\begin{frame}{Discussion: Triggers on the Book Exchange}
+\small
+\textit{To be discussed in class --- attempt before the tutorial; you may be called on to present.}
+\begin{enumerate}
+  \item[\textbf{2.}] \textbf{Triggers.}
+  \begin{enumerate}
+    \item[(a)] Adeline Wong (\texttt{awong007@msn.com}) has already borrowed 6 books and returned none.\\
+    New constraint: a student may borrow \textbf{at most 6 books at a time} --- with 6 unreturned books, they cannot borrow another.
+    \item[(b)] \texttt{student} has \texttt{CHECK(graduate >= year)}. We also want the graduation date to \textbf{not be in the future} --- but instead of rejecting a bad value (as \texttt{CHECK(graduate <= CURRENT\_DATE)} would), \textbf{change it} to the current date. Invoke on insert and update.
+  \end{enumerate}
+\end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{2(a). At Most 6 Books at a Time --- Approach}
+\small
+Easiest with an \texttt{AFTER} trigger: let the row in, then \textbf{look for violating rows; if any, raise}.
+\begin{lstlisting}[language=plpgsql,basicstyle=\ttfamily\footnotesize]
+IF EXISTS ( /* SQL query checking violating rows */ ) THEN
+  RAISE EXCEPTION '..';
+END IF;
+\end{lstlisting}
+\begin{itemize}
+  \item \textbf{Violating row} here: a borrower with \textbf{more than 6} loans where \texttt{returned IS NULL}.
+  \item Raising inside an \texttt{AFTER} trigger aborts the statement, so the offending loan is never kept.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{2(a). The Trigger Function}
+\footnotesize
+\begin{lstlisting}[language=plpgsql]
+CREATE OR REPLACE FUNCTION loan_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+  violating_student RECORD;
+BEGIN
+  -- Is there any student with more than 6 active loans?
+  SELECT l.borrower INTO violating_student
+  FROM loan l
+  WHERE l.returned ISNULL
+  GROUP BY l.borrower
+  HAVING COUNT(*) > 6;
+
+  IF violating_student IS NOT NULL THEN
+    RAISE EXCEPTION '% has borrowed more than 6 books',
+      violating_student;
+  ELSE
+    RETURN NEW;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{2(a). The Trigger}
+\small
+\begin{lstlisting}[language=plpgsql]
+CREATE TRIGGER loan_limit_trigger
+AFTER INSERT OR UPDATE ON loan
+FOR EACH ROW EXECUTE FUNCTION loan_limit();
+\end{lstlisting}
+\begin{itemize}
+  \item \textbf{\texttt{> 6}, not \texttt{>= 6}:} the check runs \emph{after} the new row is in. Adeline's existing 6 are fine; a 7th makes the count 7 and is rejected.
+  \item \textbf{\texttt{UPDATE} too:} setting \texttt{returned} back to \texttt{NULL} re-opens a loan.
+  \item Once she returns a book, she can borrow again.
+\end{itemize}
+\medskip
+To remove it:
+\begin{lstlisting}[language=plpgsql]
+DROP TRIGGER loan_limit_trigger ON loan;
+DROP FUNCTION loan_limit();
+-- or wipe everything:
+DROP SCHEMA public CASCADE; CREATE SCHEMA public;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{2(a). Alternative: a \texttt{BEFORE} Trigger}
+\footnotesize
+Check only the \textbf{new borrower}, \emph{before} the row is written --- so the limit is \texttt{>= 6}.
+\begin{lstlisting}[language=plpgsql]
+CREATE OR REPLACE FUNCTION loan_limit_before()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.returned IS NULL AND (
+       SELECT COUNT(*) FROM loan l
+       WHERE l.borrower = NEW.borrower
+         AND l.returned IS NULL) >= 6
+  THEN
+    RAISE EXCEPTION '% already has 6 books', NEW.borrower;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER loan_limit_before_trigger
+BEFORE INSERT ON loan
+FOR EACH ROW EXECUTE FUNCTION loan_limit_before();
+\end{lstlisting}
+\textbf{Off-by-one:} \texttt{BEFORE} sees the table \emph{without} the new row, \texttt{AFTER} sees it \emph{with} it.
+\end{frame}
+
+\begin{frame}[fragile,shrink=3]{2(b). No Future Graduation --- Fix, Don't Reject}
+\footnotesize
+An \texttt{AFTER} trigger can only reject. To \textbf{change} the row, we need \texttt{BEFORE} and a modified \texttt{NEW}.
+\begin{lstlisting}[language=plpgsql]
+CREATE OR REPLACE FUNCTION graduation_date()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.graduate > CURRENT_DATE THEN
+    NEW.graduate := CURRENT_DATE;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER no_future_graduation
+BEFORE INSERT OR UPDATE ON student
+FOR EACH ROW EXECUTE FUNCTION graduation_date();
+\end{lstlisting}
+\begin{itemize}
+  \item \texttt{UPDATE student SET graduate = '2030-01-01' \ldots} stores today's date instead.
+  \item \textbf{Still can fail} when \texttt{CURRENT\_DATE < year}: the clamped date violates \texttt{CHECK(graduate >= year)}.
+\end{itemize}
+\end{frame}
+
+\section{Guidelines}
+
+\begin{frame}{Guidelines \& Common Pitfalls}
+\footnotesize
+\begin{itemize}\itemsep2pt
+  \item \textbf{\texttt{BEFORE} to fix or skip a row, \texttt{AFTER} to check the result.} Only \texttt{BEFORE} can change \texttt{NEW} (2(b)).
+  \item \textbf{Cover every table that can break the rule} --- both subclasses in 1(a), both \texttt{Work} and \texttt{Projects} in 1(b).
+  \item \textbf{Query for violations, not for valid rows.} \texttt{IF EXISTS(\ldots) THEN RAISE} only works if the query finds the \emph{bad} rows (1(b)).
+  \item \textbf{Always reach a \texttt{RETURN}}, even in \texttt{AFTER} triggers (1(b)).
+  \item \textbf{Mind the off-by-one:} \texttt{AFTER} counts the new row, \texttt{BEFORE} does not (2(a)).
+  \item \textbf{Defer whole-database checks} with \texttt{CONSTRAINT TRIGGER \ldots\ DEFERRABLE INITIALLY DEFERRED} when a transaction needs several steps to become valid (1(b)).
+  \item \textbf{Silent vs.\ loud:} \texttt{RETURN NULL} in \texttt{BEFORE} drops the row without an error; \texttt{RAISE EXCEPTION} aborts it.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+Questions?\\
+Drop a mail at: pratik.karmakar@u.nus.edu
+\end{center}
+\end{frame}
+
+\end{document}
